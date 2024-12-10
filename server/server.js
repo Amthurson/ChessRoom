@@ -25,14 +25,17 @@ wss.on("connection", (ws) => {
       console.log("收到消息:", type, roomId);
 
       switch (type) {
+        case "leaveRoom":
+            handleLeaveRoom(ws, roomId);
+            break;
         case "createRoom":
-            handleCreateRoom(ws);
+            handleCreateRoom(ws, payload);
             break;
         case "getRoomList":
             handleGetRoomList(ws);
             break;
         case "joinRoom":
-            handleJoinRoom(ws, roomId);
+            handleJoinRoom(ws, roomId, payload);
             break;
         case "move":
             handleMove(ws, roomId, payload);
@@ -55,17 +58,8 @@ wss.on("connection", (ws) => {
   });
 
   ws.on("close", () => {
-    // 清理断线用户
-    Object.keys(rooms).forEach((roomId) => {
-      if (rooms[roomId]) {
-        rooms[roomId].players = rooms[roomId].players.filter((player) => player !== ws);
-        if (rooms[roomId].players.length === 0) {
-          delete rooms[roomId];
-        }
-      }
-    });
-    // 广播更新后的房间列表
-    broadcastToAll({ type: "roomList", rooms: Object.keys(rooms) });
+    console.log("WebSocket连接关闭");
+    cleanUpDisconnectedPlayer(ws);
   });
 });
 
@@ -73,12 +67,80 @@ function handleGetRoomList(ws) {
   ws.send(JSON.stringify({ type: "roomList", rooms: Object.keys(rooms) }));
 }
 
-function handleCreateRoom(ws) {
+function handleLeaveRoom(ws, roomId) {
+  const room = rooms[roomId];
+  if (!room) return;
+  
+  // 找到离开的玩家
+  const leavingPlayer = room.players.find(player => player.ws === ws);
+  if (!leavingPlayer) return;
+  
+  // 先广播消息
+  // 广播后再从房间移除玩家
+  broadcastToRoom(roomId, { 
+    type: "playerLeft", 
+    player: {
+      color: leavingPlayer.color,
+      nickname: leavingPlayer.nickname
+    },
+    state: {
+      ...room.state,
+      players: room.players.map(p => ({
+        color: p.color,
+        nickname: p.nickname
+      }))
+    }
+  });
+  room.players = room.players.filter(player => player.ws !== ws);
+  broadcastToRoom(roomId, { 
+    type: "playerLeft", 
+    player: {
+      color: leavingPlayer.color,
+      nickname: leavingPlayer.nickname
+    },
+    state: {
+      ...room.state,
+      players: room.players.map(p => ({
+        color: p.color,
+        nickname: p.nickname
+      }))
+    }
+  });
+  
+  // 如果房间空了就删除
+  if (room.players.length === 0) {
+    delete rooms[roomId];
+  }
+
+  // 更新房间列表
+  broadcastToAll({ type: "roomList", rooms: Object.keys(rooms) });
+}
+
+function handleCreateRoom(ws, payload) {
   const roomId = Date.now().toString();
-  console.log("创建新房间:", roomId);
+  const { nickname } = payload;
+  
+  // 检查所有房间中是否有相同昵称的玩家
+  const nicknameExists = Object.values(rooms).some(room => 
+    room.players.some(player => player.nickname === nickname)
+  );
+  
+  if (nicknameExists) {
+    ws.send(JSON.stringify({ 
+      type: "error", 
+      message: "该昵称已被使用，请更换昵称" 
+    }));
+    return;
+  }
+  
+  console.log("创建新房间:", roomId, "创建者昵称:", nickname);
   
   rooms[roomId] = {
-    players: [ws],
+    players: [{
+      ws,
+      color: "red",
+      nickname
+    }],
     state: createInitialState()
   };
   
@@ -86,17 +148,21 @@ function handleCreateRoom(ws) {
     type: "roomJoined",
     roomId,
     playerColor: "red",
-    state: rooms[roomId].state
+    state: {
+      ...rooms[roomId].state,
+      players: rooms[roomId].players.map(p => ({
+        color: p.color,
+        nickname: p.nickname
+      }))
+    }
   }));
   
-  // 广播更新后的房间列表
   broadcastToAll({ type: "roomList", rooms: Object.keys(rooms) });
 }
 
-function handleJoinRoom(ws, roomId) {
+function handleJoinRoom(ws, roomId, payload) {
+  const { nickname } = payload;
   console.log("尝试加入房间:", roomId);
-  console.log("当前所有房间:", Object.keys(rooms));
-  console.log("房间信息:", rooms[roomId]);
   
   if (!rooms[roomId]) {
     ws.send(JSON.stringify({ type: "error", message: "房间未找到" }));
@@ -110,19 +176,51 @@ function handleJoinRoom(ws, roomId) {
     return;
   }
 
-  room.players.push(ws);
-  const playerColor = room.players.length === 1 ? "red" : "black";
+  // 检查房间中是否有相同昵称的玩家
+  if (room.players.some(player => player.nickname === nickname)) {
+    ws.send(JSON.stringify({ 
+      type: "error", 
+      message: "该昵称已被使用，请更换昵称" 
+    }));
+    return;
+  }
+
+  // 检查现有玩家的颜色，分配另一个颜色
+  const existingPlayer = room.players[0];
+  const newPlayerColor = existingPlayer ? 
+    (existingPlayer.color === "red" ? "black" : "red") : 
+    "red";
+
+  room.players.push({
+    ws,
+    color: newPlayerColor,
+    nickname
+  });
   
+  // 发送加入成功消息给新加入的玩家
   ws.send(JSON.stringify({
     type: "roomJoined",
     roomId,
-    playerColor,
-    state: room.state
+    playerColor: newPlayerColor,
+    state: {
+      ...room.state,
+      players: room.players.map(p => ({
+        color: p.color,
+        nickname: p.nickname
+      }))
+    }
   }));
 
+  // 广播更新后的游戏状态给房间内所有玩家
   broadcastToRoom(roomId, {
-    type: "playerJoined",
-    playerColor,
+    type: "move",  // 使用 move 类型来更新状态
+    state: {
+      ...room.state,
+      players: room.players.map(p => ({
+        color: p.color,
+        nickname: p.nickname
+      }))
+    }
   });
 }
 
@@ -145,16 +243,31 @@ function handleMove(ws, roomId, move) {
 function handleUndo(ws, roomId) {
   const room = rooms[roomId];
   if (!room) return;
-  console.log(room.state.history);
-  // 恢复上一状态（仅示例）
-  if (room.state.history?.length > 0) {
-    const lastState = room.state.history[room.state.history.length - 1]; // 获取最后一个状态
-    room.state.pieces = lastState.pieces; // 恢复棋局状态
-    room.state.turn = lastState.turn; // 恢复回合状态
-    room.state.history = room.state.history.slice(0, -1); // 移除最后一个历史状态
+  
+  // 检查历史记录是否存在
+  if (room.state.history?.length > 1) {
+    // 获取倒数第二个状态（上一步的状态）
+    const previousState = room.state.history[room.state.history.length - 2];
+    
+    // 恢复到上一步的状态
+    room.state.pieces = previousState.pieces;
+    room.state.turn = previousState.turn;
+    
+    // 移除最后一步
+    room.state.history = room.state.history.slice(0, -1);
+    
+    // 广播��棋后的状态
     broadcastToRoom(roomId, {
       type: "undo",
-      state: lastState,
+      state: {
+        pieces: room.state.pieces,
+        turn: room.state.turn,
+        history: room.state.history,
+        players: room.players.map(p => ({
+          color: p.color,
+          nickname: p.nickname
+        }))
+      }
     });
   }
 }
@@ -192,8 +305,10 @@ function broadcastToRoom(roomId, message) {
   const room = rooms[roomId];
   if (!room) return;
 
-  room.players.forEach((player) => {
-    player.send(JSON.stringify(message));
+  room.players.forEach(({ws}) => {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(message));
+    }
   });
 }
 
@@ -212,4 +327,19 @@ function createInitialState() {
     turn: "red",
     history: [],
   };
+}
+
+function cleanUpDisconnectedPlayer(ws) {
+  Object.keys(rooms).forEach((roomId) => {
+    const room = rooms[roomId];
+    if (room) {
+      room.players = room.players.filter((player) => player.ws !== ws);
+      if (room.players.length === 0) {
+        delete rooms[roomId];
+        console.log(`房间 ${roomId} 已销毁`);
+      }
+    }
+  });
+  // 广播更新后的房间列表
+  broadcastToAll({ type: "roomList", rooms: Object.keys(rooms) });
 }

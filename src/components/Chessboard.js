@@ -4,7 +4,7 @@ import Piece from "./Piece";
 import { isValidMove } from "../utils/rules";
 import "../styles.css";
 
-const Chessboard = ({ gameState, onMove, onUndo, onRestart }) => {
+const Chessboard = ({ gameState, onMove, onUndo, onRestart, onLeaveRoom }) => {
     const [selectedPiece, setSelectedPiece] = useState(null);
     const [turn, setTurn] = useState(gameState.turn);
     const [pieces, setPieces] = useState(gameState.pieces);
@@ -149,15 +149,20 @@ const Chessboard = ({ gameState, onMove, onUndo, onRestart }) => {
         }
     }
 
+    const handleLeaveRoom = () => {
+        onLeaveRoom();
+    };
+
     return (
         <div className="chessboard-container">
-        <h1>中国象棋</h1>
-        <h2>当前回合：<span className={turn === "red" ? "red" : "black"}>{turn === "red" ? "红方" : "黑方"}</span></h2>
-        {winner ? <h2>胜者：{winner}</h2> : null}
+        <h3>中国象棋</h3>
+        <h4>当前回合：<span className={turn === "red" ? "red" : "black"}>{turn === "red" ? "红方" : "黑方"}</span></h4>
+        {winner ? <h4>胜者：{winner}</h4> : null}
         <button onClick={handleUndo} disabled={history?.length === 0}>
             悔棋
         </button>
         <button onClick={handleRestart}>重新开始</button>
+        <button onClick={handleLeaveRoom}>离开房间</button>
         <div className="chessboard">{board}</div>
         </div>
     );

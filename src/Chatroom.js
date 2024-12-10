@@ -7,6 +7,11 @@ const ChessRoom = () => {
   const [gameState, setGameState] = useState(null);
   const [roomList, setRoomList] = useState([]);
   const [roomId, setRoomId] = useState(null);
+  const [nickname, setNickname] = useState(()=>localStorage.getItem("nickname") || "");
+
+    useEffect(() => {
+        localStorage.setItem("nickname", nickname);
+    }, [nickname]);
 
   useEffect(() => {
     let socket = null;
@@ -46,6 +51,20 @@ const ChessRoom = () => {
       console.log("收到服务器消息:", data);
 
       switch (data.type) {
+        case "playerLeft":
+            console.log("playerLeft", data.player, ws);
+            console.log("nickname", data.player.nickname, nickname);
+            if (data.player.nickname === nickname) {
+                alert("你已离开房间");
+                setRoomId(null);
+                setPlayerColor(null);
+                setGameState(null);
+            } else {
+                alert("对手已离开");
+                console.log("data.state", gameState, data.state);
+                setGameState(data.state);
+            }
+          break;
         case "roomList":
           // 只在房间列表有变化时更新
           if (JSON.stringify(roomList) !== JSON.stringify(data.rooms)) {
@@ -79,18 +98,33 @@ const ChessRoom = () => {
     };
 
     ws.onmessage = handleMessage;
-  }, [ws, roomList]); // 添加 roomList 作为依赖
+  }, [ws, roomList, gameState, playerColor, nickname]); // 添加 roomList 作为依赖
 
   const handleCreateRoom = () => {
+    if (!nickname) {
+      alert("请先输入昵称");
+      return;
+    }
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "createRoom" }));
+      ws.send(JSON.stringify({ 
+        type: "createRoom",
+        payload: { nickname }
+      }));
     }
   };
 
   const handleJoinRoom = (roomId) => {
+    if (!nickname) {
+      alert("请先输入昵称");
+      return;
+    }
     if (ws && ws.readyState === WebSocket.OPEN) {
       console.log("尝试加入房间:", roomId);
-      ws.send(JSON.stringify({ type: "joinRoom", roomId: roomId.toString() }));
+      ws.send(JSON.stringify({ 
+        type: "joinRoom", 
+        roomId: roomId.toString(),
+        payload: { nickname }
+      }));
     }
   };
 
@@ -112,12 +146,21 @@ const ChessRoom = () => {
     }
   };
 
+  const handleLeaveRoom = () => {
+    if (ws) {
+      ws.send(JSON.stringify({ type: "leaveRoom", roomId }));
+    }
+  };
+
   return (
     <div>
-      <h2>房间列表</h2>
-      {roomList.length === 0 ? (
+      <input type="text" placeholder="请输入昵称" value={nickname} onChange={(e) => setNickname(e.target.value)} />
+      {gameState === null && (
+        <h3>房间列表</h3>
+      )}
+      {roomList.length === 0 && gameState === null ? (
         <p>暂无可用房间</p>
-      ) : (
+      ) : gameState === null && (
         roomList.map((room) => (
           <div 
             key={room} 
@@ -128,12 +171,24 @@ const ChessRoom = () => {
           </div>
         ))
       )}
-      <button onClick={handleCreateRoom}>创建房间</button>
+      {gameState === null && <button onClick={handleCreateRoom}>创建房间</button>}
       {roomId && (
         <>
-          <h1>房间号: {roomId}</h1>
-          <h2>你是: {playerColor === "red" ? "红方" : "黑方"}</h2>
-          {gameState && <Chessboard gameState={gameState} onMove={handleMove} onUndo={handleUndo} onRestart={handleRestart} />}
+          <h3>房间号: {roomId}</h3>
+          {gameState?.players && (
+            <div className="player-info">
+              <div>红方: {gameState.players.find(player => player.color === "red")?.nickname || "等待加入"}</div>
+              <div>黑方: {gameState.players.find(player => player.color === "black")?.nickname || "等待加入"}</div>
+            </div>
+          )}
+          <h4>你是: {playerColor === "red" ? "红方" : "黑方"}</h4>
+          {gameState && <Chessboard 
+            gameState={gameState} 
+            onMove={handleMove} 
+            onUndo={handleUndo} 
+            onRestart={handleRestart} 
+            onLeaveRoom={handleLeaveRoom}
+          />}
         </>
       )}
     </div>
