@@ -75,8 +75,6 @@ Chinese Chess (Xiangqi) is played between two players on a board of 9x10 interse
 - 2 Cannons (炮/砲)
 - 5 Soldiers (兵/卒)
 
-[You can add more specific rules or link to a comprehensive rule guide]
-
 This project exists thanks to all the people who contribute:
 
 <a href="https://github.com/Amthurson/ChessRoom/graphs/contributors">
