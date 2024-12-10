@@ -1,0 +1,91 @@
+.chessboard-container {
+  background-color: #333;
+  padding: 20px;
+  height: 100%;
+  & h1 {
+    color: #fff;
+  }
+  & h2 {
+    color: #fff;
+  }
+  & .red {
+    color: red;
+  }
+  & .black {
+    color: black;
+  }
+}
+
+.chessboard {
+  display: flex;
+  flex-direction: column;
+  background: #333;
+  border: 2px solid #000;
+  width: fit-content;
+  margin: 0 auto;
+}
+  
+.square {
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f0d9b5;
+    border: 1px solid #000;
+    cursor: pointer;
+}
+
+.square.selected {
+    background: yellow; /* 高亮选中的格子 */
+}
+
+.piece {
+    font-size: 24px;
+    cursor: pointer;
+    text-align: center;
+}
+  
+
+.board-row {
+  display: grid;
+  grid-template-columns: repeat(9, 60px);
+  grid-template-rows: 60px;
+}
+
+.chess-divider {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 40px;
+  font-size: 16px;
+  color: #000;
+  font-weight: bold;
+  background: #f0d9b5bb;
+  padding: 0 10px;
+  border-left: 1px solid #000;
+  border-right: 1px solid #000;
+}
+
+.piece {
+  font-size: 24px;
+  cursor: pointer;
+  text-align: center;
+  border: 1px solid #000;
+  border-radius: 50px;
+  background: rgb(255, 255, 226);
+  width: 40px;
+  height: 40px;
+}
+button {
+    margin: 10px;
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+}
+  
+button:disabled {
+    background-color: #ccc;
+    color: #666;
+    cursor: not-allowed;
+}
