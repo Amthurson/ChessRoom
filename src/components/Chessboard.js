@@ -30,13 +30,7 @@ const Chessboard = ({ gameState, onMove, onUndo, onRestart, onLeaveRoom, playerC
             
             return () => clearTimeout(timer);
         }
-    }, [gameState, playerColor]);
-
-    // 检查棋子是否属于当前回合的玩家
-    const isCurrentTurnPiece = (piece) => {
-        const isRed = ["帥", "仕", "相", "車", "馬", "炮", "卒"].includes(piece);
-        return (turn === "red" && isRed) || (turn === "black" && !isRed);
-    };
+    }, [gameState, playerColor, onMove]);
 
     // 检查是否有一方获胜
     const checkWinner = (currentPieces) => {

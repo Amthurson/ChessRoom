@@ -1,19 +1,90 @@
-const express = require("express");
-const { WebSocketServer, WebSocket } = require("ws");
+import { serve } from "https://deno.land/std/http/server.ts";
+import { WebSocketServer, WebSocket } from "https://deno.land/x/websocket/mod.ts";
 
-const app = express();
+const rooms = {}; // 改为 const，并移到顶层
 const PORT = 3001;
 
-// 将 rooms 移到全局作用域
-const rooms = {};  // 改为 const，并移到顶层
+async function handler(req) {
+  const { pathname } = new URL(req.url);
+  if (pathname === "/") {
+    const fileContent = await Deno.readFile("./build/index.html");
+    return new Response(fileContent, {
+      status: 200,
+      headers: { "Content-Type": "text/html" },
+    });
+  }
+  // 可以继续添加更多静态文件处理逻辑
+}
 
-// 启动 HTTP 服务
-const server = app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+const server = serve(handler);
+console.log(`Server running at http://localhost:${PORT}`);
+
+const wss = new WebSocketServer({ server });
+
+wss.on("connection", (ws) => {
+  console.log("新的WebSocket连接");
+
+  ws.on("message", (message) => {
+    try {
+      const data = JSON.parse(message);
+      const { type, roomId, payload } = data;
+      console.log("收到消息:", type, roomId);
+
+      switch (type) {
+        case "leaveRoom":
+            handleLeaveRoom(ws, roomId);
+            break;
+        case "createRoom":
+            handleCreateRoom(ws, payload);
+            break;
+        case "getRoomList":
+            handleGetRoomList(ws);
+            break;
+        case "joinRoom":
+            handleJoinRoom(ws, roomId, payload);
+            break;
+        case "move":
+            handleMove(ws, roomId, payload);
+            break;
+        case "undo":
+            handleUndo(ws, roomId);
+            break;
+        case "restart":
+            handleRestart(ws, roomId);
+            break;
+        case "disconnect":
+            handleDisconnect(ws, roomId);
+            break;
+        case "toggleAI":
+            handleToggleAI(ws, roomId);
+            break;
+        default:
+            console.log("Unknown message type:", type);
+      }
+    } catch (error) {
+      console.error("消息处理错误:", error);
+    }
+  });
+
+  ws.on("close", () => {
+    console.log("WebSocket连接关闭");
+    cleanUpDisconnectedPlayer(ws);
+  });
 });
 
-// 启动 WebSocket 服务
-const wss = new WebSocketServer({ server });
+const app = express();
+// const PORT = 3001;
+
+// // 将 rooms 移到全局作用域
+// const rooms = {};  // 改为 const，并移到顶层
+
+// // 启动 HTTP 服务
+// const server = app.listen(PORT, () => {
+//   console.log(`Server is running on http://localhost:${PORT}`);
+// });
+
+// // 启动 WebSocket 服务
+// const wss = new WebSocketServer({ server });
 
 wss.on("connection", (ws) => {
   console.log("新的WebSocket连接");

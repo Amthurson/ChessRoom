@@ -119,7 +119,7 @@ export const isValidMove = (from, to, piece, pieces) => {
   // 帅/将移动规则
   const validateKingMove = (fromRow, fromCol, toRow, toCol) => {
     const isInPalace = (row, col) =>
-      col >= 3 && col <= 5 && (row >= 0 && row <= 2 || row >= 7 && row <= 9);
+      col >= 3 && col <= 5 && ((row >= 0 && row <= 2) || (row >= 7 && row <= 9));
   
     return (
       isInPalace(toRow, toCol) &&
