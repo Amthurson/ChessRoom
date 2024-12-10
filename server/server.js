@@ -49,6 +49,9 @@ wss.on("connection", (ws) => {
         case "disconnect":
             handleDisconnect(ws, roomId);
             break;
+        case "toggleAI":
+            handleToggleAI(ws, roomId);
+            break;
         default:
             console.log("Unknown message type:", type);
     }
@@ -211,22 +214,29 @@ function handleJoinRoom(ws, roomId, payload) {
     }
   }));
 
-  // 广播更新后的游戏状态给房间内所有玩家
-  broadcastToRoom(roomId, {
-    type: "move",  // 使用 move 类型来更新状态
-    state: {
-      ...room.state,
-      players: room.players.map(p => ({
-        color: p.color,
-        nickname: p.nickname
-      }))
-    }
-  });
+  // 在玩家加入成功后，广播游戏开始消息
+  if (room.players.length === 2) {
+    broadcastToRoom(roomId, {
+      type: "gameStart",
+      state: {
+        ...room.state,
+        players: room.players.map(p => ({
+          color: p.color,
+          nickname: p.nickname
+        }))
+      }
+    });
+  }
 }
 
 function handleMove(ws, roomId, move) {
-  const room = rooms[roomId];
-  if (!room) return;
+    const room = rooms[roomId];
+    if (!room) return;
+
+    // 检查是否有两个玩家
+    if (room.players.length !== 2 && !room.state.isAIMode) {
+        return;
+    }
 
   // 更新棋盘状态
   room.state.pieces = move.pieces;
@@ -337,7 +347,32 @@ function createInitialState() {
     },
     turn: "red",
     history: [],
+    isAIMode: false,  // 添加AI模式标志
   };
+}
+// 添加处理切换AI模式的函数
+function handleToggleAI(ws, roomId) {
+    const room = rooms[roomId];
+    if (!room) return;
+  
+    // 只有房主（红方）可以切换AI模式
+    const player = room.players.find(p => p.ws === ws);
+    if (!player || player.color !== "red") return;
+  
+    // 切换AI模式
+    room.state.isAIMode = !room.state.isAIMode;
+  
+    // 广播更新后的状态
+    broadcastToRoom(roomId, {
+      type: "aiModeChanged",
+      state: {
+        ...room.state,
+        players: room.players.map(p => ({
+          color: p.color,
+          nickname: p.nickname
+        }))
+      }
+    });
 }
 
 function cleanUpDisconnectedPlayer(ws) {

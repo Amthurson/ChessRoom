@@ -3,6 +3,7 @@ import Square from "./Square";
 import Piece from "./Piece";
 import { isValidMove } from "../utils/rules";
 import "../styles.css";
+import { getNextMove, shouldMakeMove } from '../utils/autoPlayer';
 
 const Chessboard = ({ gameState, onMove, onUndo, onRestart, onLeaveRoom, playerColor }) => {
     const [selectedPiece, setSelectedPiece] = useState(null);
@@ -16,7 +17,20 @@ const Chessboard = ({ gameState, onMove, onUndo, onRestart, onLeaveRoom, playerC
         setPieces(gameState.pieces);
         setTurn(gameState.turn);
         setHistory(gameState.history);
-    }, [gameState]);
+
+        // 只在AI模式开启时才执行AI移动
+        if (gameState?.isAIMode && shouldMakeMove(gameState, playerColor)) {
+            // 添加一个小延迟，使移动看起来更自然
+            const timer = setTimeout(() => {
+                const aiMove = getNextMove(gameState, gameState.turn === "red");
+                if (aiMove) {
+                    onMove(aiMove);
+                }
+            }, 500);
+            
+            return () => clearTimeout(timer);
+        }
+    }, [gameState, playerColor]);
 
     // 检查棋子是否属于当前回合的玩家
     const isCurrentTurnPiece = (piece) => {
