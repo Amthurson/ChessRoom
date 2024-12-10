@@ -187,6 +187,7 @@ const ChessRoom = () => {
             onMove={handleMove} 
             onUndo={handleUndo} 
             onRestart={handleRestart} 
+            playerColor={playerColor}
             onLeaveRoom={handleLeaveRoom}
           />}
         </>

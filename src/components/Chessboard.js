@@ -4,7 +4,7 @@ import Piece from "./Piece";
 import { isValidMove } from "../utils/rules";
 import "../styles.css";
 
-const Chessboard = ({ gameState, onMove, onUndo, onRestart, onLeaveRoom }) => {
+const Chessboard = ({ gameState, onMove, onUndo, onRestart, onLeaveRoom, playerColor }) => {
     const [selectedPiece, setSelectedPiece] = useState(null);
     const [turn, setTurn] = useState(gameState.turn);
     const [pieces, setPieces] = useState(gameState.pieces);
@@ -40,36 +40,53 @@ const Chessboard = ({ gameState, onMove, onUndo, onRestart, onLeaveRoom }) => {
     const handleSquareClick = (position) => {
         if (winner) return; // 游戏结束后不允许继续操作
 
+        // 检查是否是当前玩家的回合
+        if (turn !== playerColor) {
+            alert("还没轮到你的回合");
+            return;
+        }
+
         if (selectedPiece) {
-        const piece = pieces[selectedPiece];
-        if (isValidMove(selectedPiece, position, piece, pieces)) {
-            // 保存当前状态到历史记录
-            // setHistory((prevHistory) => [...prevHistory, { pieces, turn }]);
+            const piece = pieces[selectedPiece];
+            // 检查是否是当前玩家的棋子
+            if ((playerColor === "red" && !isRedPiece(piece)) || 
+                (playerColor === "black" && !isBlackPiece(piece))) {
+                alert("只能移动自己的棋子");
+                setSelectedPiece(null);
+                return;
+            }
 
-            // 更新棋局
-            const newPieces = { ...pieces };
-            newPieces[position] = newPieces[selectedPiece];
-            delete newPieces[selectedPiece];
-            setPieces(newPieces);
+            if (isValidMove(selectedPiece, position, piece, pieces)) {
+                // 保存当前状态到历史记录
+                // setHistory((prevHistory) => [...prevHistory, { pieces, turn }]);
 
-            setSelectedPiece(null);
-            const newTurn = turn === "red" ? "black" : "red";
-            setTurn(newTurn); // 切换回合
-            
+                // 更新棋局
+                const newPieces = { ...pieces };
+                newPieces[position] = newPieces[selectedPiece];
+                delete newPieces[selectedPiece];
+                setPieces(newPieces);
 
-            // 通知服务器
-            onMove({ pieces: newPieces, turn: newTurn });
+                setSelectedPiece(null);
+                const newTurn = turn === "red" ? "black" : "red";
+                setTurn(newTurn); // 切换回合
 
-            // 检查是否有一方获胜
-            checkWinner(newPieces);
-        } else {
-            setSelectedPiece(null);
-        }
+                // 通知服务器
+                onMove({ pieces: newPieces, turn: newTurn });
+
+                // 检查是否有一方获胜
+                checkWinner(newPieces);
+            } else {
+                setSelectedPiece(null);
+            }
         } else if (pieces[position]) {
-        const piece = pieces[position];
-        if (isCurrentTurnPiece(piece)) {
-            setSelectedPiece(position); // 选中棋子
-        }
+            const piece = pieces[position];
+            // 检查是否是当前玩家的棋子
+            if ((playerColor === "red" && isRedPiece(piece)) || 
+                (playerColor === "black" && isBlackPiece(piece))) {
+                setSelectedPiece(position); // 选中棋子
+            } else {
+                alert("只能选择自己的棋子");
+            }
         }
     };
 
@@ -152,6 +169,10 @@ const Chessboard = ({ gameState, onMove, onUndo, onRestart, onLeaveRoom }) => {
     const handleLeaveRoom = () => {
         onLeaveRoom();
     };
+
+    // Helper functions to determine piece color
+    const isRedPiece = (piece) => ["帥", "仕", "相", "車", "馬", "炮", "卒"].includes(piece);
+    const isBlackPiece = (piece) => ["将", "士", "象", "车", "马", "砲", "兵"].includes(piece);
 
     return (
         <div className="chessboard-container">
