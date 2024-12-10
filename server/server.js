@@ -234,42 +234,53 @@ function handleMove(ws, roomId, move) {
 
   room.state.history.push(move);
 
+  // 广播时包含玩家信息
   broadcastToRoom(roomId, {
     type: "move",
-    state: room.state,
+    state: {
+      ...room.state,
+      players: room.players.map(p => ({
+        color: p.color,
+        nickname: p.nickname
+      }))
+    }
   });
 }
 
 function handleUndo(ws, roomId) {
-  const room = rooms[roomId];
-  if (!room) return;
-  
-  // 检查历史记录是否存在
-  if (room.state.history?.length > 1) {
-    // 获取倒数第二个状态（上一步的状态）
-    const previousState = room.state.history[room.state.history.length - 2];
+    const room = rooms[roomId];
+    if (!room) return;
     
-    // 恢复到上一步的状态
-    room.state.pieces = previousState.pieces;
-    room.state.turn = previousState.turn;
+    // 检查历史记录是否存在
+    if (room.state.history?.length > 0) {  // 改为 > 0
+    // 如果是最后一步，恢复到初始状态
+    if (room.state.history.length === 1) {
+        room.state = createInitialState();
+    } else {
+        // 获取倒数第二个状态（上一步的状态）
+        const previousState = room.state.history[room.state.history.length - 2];
+        // 恢复到上一步的状态
+        room.state.pieces = previousState.pieces;
+        room.state.turn = previousState.turn;
+    }
     
     // 移除最后一步
     room.state.history = room.state.history.slice(0, -1);
     
-    // 广播��棋后的状态
+    // 广播悔棋后的状态
     broadcastToRoom(roomId, {
-      type: "undo",
-      state: {
+        type: "undo",
+        state: {
         pieces: room.state.pieces,
         turn: room.state.turn,
         history: room.state.history,
         players: room.players.map(p => ({
-          color: p.color,
-          nickname: p.nickname
+            color: p.color,
+            nickname: p.nickname
         }))
-      }
+        }
     });
-  }
+    }
 }
 
 function handleRestart(ws, roomId) {
